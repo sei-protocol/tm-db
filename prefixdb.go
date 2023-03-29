@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"sync"
+
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 // PrefixDB wraps a namespace of another database as a logical database.
@@ -178,6 +180,13 @@ func (pdb *PrefixDB) Stats() map[string]string {
 		stats["prefixdb.source."+key] = value
 	}
 	return stats
+}
+
+func (pdb *PrefixDB) Housekeep() error {
+	if goleveldb, ok := pdb.db.(*GoLevelDB); ok {
+		return goleveldb.DB().CompactRange(util.Range{Start: nil, Limit: nil})
+	}
+	return nil
 }
 
 func (pdb *PrefixDB) prefixed(key []byte) []byte {
