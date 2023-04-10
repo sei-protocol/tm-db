@@ -1,4 +1,3 @@
-//go:build cleveldb
 // +build cleveldb
 
 package db
@@ -154,10 +153,14 @@ func (db *CLevelDB) Print() error {
 // Stats implements DB.
 func (db *CLevelDB) Stats() map[string]string {
 	keys := []string{
+		"leveldb.aliveiters",
+		"leveldb.alivesnaps",
+		"leveldb.blockpool",
+		"leveldb.cachedblock",
 		"leveldb.num-files-at-level{n}",
+		"leveldb.openedtables",
 		"leveldb.sstables",
 		"leveldb.stats",
-		"leveldb.approximate-memory-usage",
 	}
 
 	stats := make(map[string]string, len(keys))

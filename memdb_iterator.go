@@ -3,9 +3,6 @@ package db
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"runtime/debug"
-	"time"
 
 	"github.com/google/btree"
 )
@@ -48,7 +45,6 @@ func newMemDBIteratorMtxChoice(db *MemDB, start []byte, end []byte, reverse bool
 	if useMtx {
 		db.mtx.RLock()
 	}
-	callingStack := debug.Stack()
 	go func() {
 		if useMtx {
 			defer db.mtx.RUnlock()
@@ -68,15 +64,11 @@ func newMemDBIteratorMtxChoice(db *MemDB, start []byte, end []byte, reverse bool
 			if abortLessThan != nil && bytes.Compare(item.key, abortLessThan) == -1 {
 				return false
 			}
-			for {
-				select {
-				case <-ctx.Done():
-					return false
-				case ch <- &item:
-					return true
-				case <-time.After(10 * time.Second):
-					fmt.Printf("TMDBTEST stuck channel called by %s\n", callingStack)
-				}
+			select {
+			case <-ctx.Done():
+				return false
+			case ch <- &item:
+				return true
 			}
 		}
 		switch {
