@@ -6,15 +6,22 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
+	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
+
+const BloomFilterBitSize = 256
 
 func init() {
 	dbCreator := func(name string, dir string) (DB, error) {
 		return NewGoLevelDB(name, dir)
 	}
 	registerDBCreator(GoLevelDBBackend, dbCreator, false)
+	dbCreatorWithBloomFilter := func(name string, dir string) (DB, error) {
+		return NewGoLevelDBWithBloomFilter(name, dir)
+	}
+	registerDBCreator(GoLevelDBBackendWithBloomFilter, dbCreatorWithBloomFilter, false)
 }
 
 type GoLevelDB struct {
@@ -25,6 +32,10 @@ var _ DB = (*GoLevelDB)(nil)
 
 func NewGoLevelDB(name string, dir string) (*GoLevelDB, error) {
 	return NewGoLevelDBWithOpts(name, dir, nil)
+}
+
+func NewGoLevelDBWithBloomFilter(name string, dir string) (*GoLevelDB, error) {
+	return NewGoLevelDBWithOpts(name, dir, &opt.Options{Filter: filter.NewBloomFilter(BloomFilterBitSize)})
 }
 
 func NewGoLevelDBWithOpts(name string, dir string, o *opt.Options) (*GoLevelDB, error) {

@@ -13,7 +13,8 @@ const (
 	// popular implementation)
 	//   - pure go
 	//   - stable
-	GoLevelDBBackend BackendType = "goleveldb"
+	GoLevelDBBackend                BackendType = "goleveldb"
+	GoLevelDBBackendWithBloomFilter BackendType = "goleveldb-bloom"
 	// CLevelDBBackend represents cleveldb (uses levigo wrapper)
 	//   - fast
 	//   - requires gcc
