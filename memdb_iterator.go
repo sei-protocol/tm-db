@@ -43,53 +43,17 @@ func newMemDBIteratorMtxChoice(db *MemDB, start []byte, end []byte, reverse bool
 	}
 
 	if useMtx {
+		// unlocked in loadItems
 		db.mtx.RLock()
 	}
 	go func() {
-		if useMtx {
-			defer db.mtx.RUnlock()
-		}
-		// Because we use [start, end) for reverse ranges, while btree uses (start, end], we need
-		// the following variables to handle some reverse iteration conditions ourselves.
-		var (
-			skipEqual     []byte
-			abortLessThan []byte
-		)
-		visitor := func(i btree.Item) bool {
-			item := i.(item)
-			if skipEqual != nil && bytes.Equal(item.key, skipEqual) {
-				skipEqual = nil
-				return true
-			}
-			if abortLessThan != nil && bytes.Compare(item.key, abortLessThan) == -1 {
-				return false
-			}
+		for _, item := range loadItems(db, start, end, reverse, useMtx) {
 			select {
 			case <-ctx.Done():
-				return false
-			case ch <- &item:
-				return true
+				break
+			case ch <- item:
+				continue
 			}
-		}
-		switch {
-		case start == nil && end == nil && !reverse:
-			db.btree.Ascend(visitor)
-		case start == nil && end == nil && reverse:
-			db.btree.Descend(visitor)
-		case end == nil && !reverse:
-			// must handle this specially, since nil is considered less than anything else
-			db.btree.AscendGreaterOrEqual(newKey(start), visitor)
-		case !reverse:
-			db.btree.AscendRange(newKey(start), newKey(end), visitor)
-		case end == nil:
-			// abort after start, since we use [start, end) while btree uses (start, end]
-			abortLessThan = start
-			db.btree.Descend(visitor)
-		default:
-			// skip end and abort after start, since we use [start, end) while btree uses (start, end]
-			skipEqual = end
-			abortLessThan = start
-			db.btree.DescendLessOrEqual(newKey(end), visitor)
 		}
 		close(ch)
 	}()
@@ -154,4 +118,50 @@ func (i *memDBIterator) assertIsValid() {
 	if !i.Valid() {
 		panic("iterator is invalid")
 	}
+}
+
+func loadItems(db *MemDB, start []byte, end []byte, reverse bool, useMtx bool) []*item {
+	// Because we use [start, end) for reverse ranges, while btree uses (start, end], we need
+	// the following variables to handle some reverse iteration conditions ourselves.
+	if useMtx {
+		defer db.mtx.RUnlock()
+	}
+	var (
+		skipEqual     []byte
+		abortLessThan []byte
+		items         []*item
+	)
+	visitor := func(i btree.Item) bool {
+		item := i.(item)
+		if skipEqual != nil && bytes.Equal(item.key, skipEqual) {
+			skipEqual = nil
+			return true
+		}
+		if abortLessThan != nil && bytes.Compare(item.key, abortLessThan) == -1 {
+			return false
+		}
+		items = append(items, &item)
+		return true
+	}
+	switch {
+	case start == nil && end == nil && !reverse:
+		db.btree.Ascend(visitor)
+	case start == nil && end == nil && reverse:
+		db.btree.Descend(visitor)
+	case end == nil && !reverse:
+		// must handle this specially, since nil is considered less than anything else
+		db.btree.AscendGreaterOrEqual(newKey(start), visitor)
+	case !reverse:
+		db.btree.AscendRange(newKey(start), newKey(end), visitor)
+	case end == nil:
+		// abort after start, since we use [start, end) while btree uses (start, end]
+		abortLessThan = start
+		db.btree.Descend(visitor)
+	default:
+		// skip end and abort after start, since we use [start, end) while btree uses (start, end]
+		skipEqual = end
+		abortLessThan = start
+		db.btree.DescendLessOrEqual(newKey(end), visitor)
+	}
+	return items
 }
