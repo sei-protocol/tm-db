@@ -63,6 +63,10 @@ type DB interface {
 	// NewBatch creates a batch for atomic updates. The caller must call Batch.Close.
 	NewBatch() Batch
 
+	// NewBatchWithSize create a new batch for atomic updates, but with pre-allocated size.
+	// This will does the same thing as NewBatch if the batch implementation doesn't support pre-allocation.
+	NewBatchWithSize(int) Batch
+
 	// Print is used for debugging.
 	Print() error
 
@@ -94,6 +98,11 @@ type Batch interface {
 
 	// Close closes the batch. It is idempotent, but calls to other methods afterwards will error.
 	Close() error
+
+	// GetByteSize that returns the current size of the batch in bytes. Depending on the implementation,
+	// this may return the size of the underlying LSM batch, including the size of additional metadata
+	// on top of the expected key and value total byte count.
+	GetByteSize() (int, error)
 }
 
 // Iterator represents an iterator over a domain of keys. Callers must call Close when done.

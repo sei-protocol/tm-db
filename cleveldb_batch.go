@@ -8,12 +8,14 @@ import "github.com/jmhodges/levigo"
 type cLevelDBBatch struct {
 	db    *CLevelDB
 	batch *levigo.WriteBatch
+	size int
 }
 
 func newCLevelDBBatch(db *CLevelDB) *cLevelDBBatch {
 	return &cLevelDBBatch{
 		db:    db,
 		batch: levigo.NewWriteBatch(),
+		size: 0,
 	}
 }
 
@@ -28,6 +30,7 @@ func (b *cLevelDBBatch) Set(key, value []byte) error {
 	if b.batch == nil {
 		return errBatchClosed
 	}
+	b.size += len(key) + len(value)
 	b.batch.Put(key, value)
 	return nil
 }
@@ -40,6 +43,7 @@ func (b *cLevelDBBatch) Delete(key []byte) error {
 	if b.batch == nil {
 		return errBatchClosed
 	}
+	b.size += len(key)
 	b.batch.Delete(key)
 	return nil
 }
@@ -76,6 +80,15 @@ func (b *cLevelDBBatch) Close() error {
 	if b.batch != nil {
 		b.batch.Close()
 		b.batch = nil
+		b.size = 0
 	}
 	return nil
+}
+
+// GetByteSize implements Batch
+func (b *cLevelDBBatch) GetByteSize() (int, error) {
+	if b.batch == nil {
+		return 0, errBatchClosed
+	}
+	return b.size, nil
 }

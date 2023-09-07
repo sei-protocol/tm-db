@@ -20,6 +20,7 @@ type operation struct {
 type memDBBatch struct {
 	db  *MemDB
 	ops []operation
+	size int
 }
 
 var _ Batch = (*memDBBatch)(nil)
@@ -29,6 +30,7 @@ func newMemDBBatch(db *MemDB) *memDBBatch {
 	return &memDBBatch{
 		db:  db,
 		ops: []operation{},
+		size: 0,
 	}
 }
 
@@ -43,6 +45,7 @@ func (b *memDBBatch) Set(key, value []byte) error {
 	if b.ops == nil {
 		return errBatchClosed
 	}
+	b.size += len(key) + len(value)
 	b.ops = append(b.ops, operation{opTypeSet, key, value})
 	return nil
 }
@@ -55,6 +58,7 @@ func (b *memDBBatch) Delete(key []byte) error {
 	if b.ops == nil {
 		return errBatchClosed
 	}
+	b.size += len(key)
 	b.ops = append(b.ops, operation{opTypeDelete, key, nil})
 	return nil
 }
@@ -90,5 +94,14 @@ func (b *memDBBatch) WriteSync() error {
 // Close implements Batch.
 func (b *memDBBatch) Close() error {
 	b.ops = nil
+	b.size = 0
 	return nil
+}
+
+// GetByteSize implements Batch
+func (b *memDBBatch) GetByteSize() (int, error) {
+	if b.ops == nil {
+		return 0, errBatchClosed
+	}
+	return b.size, nil
 }
